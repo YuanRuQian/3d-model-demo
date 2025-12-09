@@ -1,6 +1,7 @@
 // src/index.tsx
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xfff8e8);
@@ -40,11 +41,6 @@ const glassShell = new THREE.Mesh(
 );
 glassShell.renderOrder = 999;
 scene.add(glassShell);
-
-// ———————— DELETE THE ENTIRE WATER SPHERE MESH ————————
-// Remove these lines completely:
-// const water = new THREE.Mesh( ... )
-// scene.add(water);
 
 // ———————— INSTEAD: FAKE THE WATER WITH TRANSMISSION ONLY ————————
 glassShell.material = new THREE.MeshPhysicalMaterial({
@@ -118,28 +114,38 @@ baseGroup.add(ring);
 // ADD TO SCENE, NOT WATER!!!
 scene.add(baseGroup);
 
-// ———————— SNOWMAN (also in world space) ————————
-const body = new THREE.Mesh(
-  new THREE.SphereGeometry(28),
-  new THREE.MeshStandardMaterial({ color: 0xffffff })
-);
-body.position.y = -60;
-scene.add(body); // ← scene, not water!
+// ———————— HOT CHOCOLATE MARSHMALLOW SNOWMAN (SPINS WITH GLOBE!) ————————
+let hotChocolate: THREE.Group;
 
-const head = new THREE.Mesh(
-  new THREE.SphereGeometry(18),
-  new THREE.MeshStandardMaterial({ color: 0xffffff })
-);
-head.position.y = -25;
-scene.add(head);
+const gltfLoader = new GLTFLoader();
 
-const nose = new THREE.Mesh(
-  new THREE.ConeGeometry(4, 16, 16),
-  new THREE.MeshStandardMaterial({ color: 0xff8800 })
-);
-nose.position.set(0, -25, 16);
-nose.rotation.x = Math.PI / 2;
-scene.add(nose);
+
+gltfLoader.load('/christmas_hot_chocolate_with_marshmallow_snowman.glb', (gltf) => {
+  hotChocolate = gltf.scene;
+
+  // Scale & position perfectly inside globe
+  hotChocolate.scale.set(45, 45, 45);        // perfect size
+  hotChocolate.position.set(0, -68, 0);     // sits on snow base
+  hotChocolate.rotation.y = Math.PI / 6;    // cute angle
+
+  // Make materials pop (extra shiny & warm)
+  hotChocolate.traverse((child) => {
+    if ((child as THREE.Mesh).isMesh) {
+      const mesh = child as THREE.Mesh;
+      const mat = mesh.material as THREE.MeshStandardMaterial;
+      if (mat) {
+        mat.metalness = mat.name.includes('chocolate') ? 0.3 : 0.1;
+        mat.roughness = mat.name.includes('marshmallow') ? 0.8 : 0.4;
+        mat.envMapIntensity = 3.0;
+      }
+    }
+  });
+
+  // CRITICAL: Add to glassShell so it rotates with the globe!
+  glassShell.add(hotChocolate);
+
+  console.log('Hot chocolate snowman loaded — winter perfection achieved!');
+});
 
 // ———————— SNOWFLAKE PHYSICS ————————
 const flakes: THREE.Mesh[] = [];
@@ -149,7 +155,6 @@ const snowTexture = new THREE.TextureLoader().load('/snowflake.png');
 const GROUND_Y = snowBase.position.y + 24; // 48/2 = 24
 const flake_heights = [];
 function spawnSnow() {
-  flakes.forEach((f) => water.remove(f));
   flakes.length = 0;
 
   for (let i = 0; i < 800; i++) {
@@ -227,11 +232,10 @@ const groundY = -60; // top of snow base
 function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
+  const time = clock.getElapsedTime();
 
   // Gentle auto-spin (optional, looks magical)
   glassShell.rotation.y += 0.0008;
-
-  const time = clock.getElapsedTime(); // for swirling patterns
 
   flakes.forEach((flake) => {
     const pos = flake.position;
