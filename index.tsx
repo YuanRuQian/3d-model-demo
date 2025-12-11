@@ -115,36 +115,18 @@ baseGroup.add(ring);
 scene.add(baseGroup);
 
 // ———————— HOT CHOCOLATE MARSHMALLOW SNOWMAN (SPINS WITH GLOBE!) ————————
-let hotChocolate: THREE.Group;
 
 const gltfLoader = new GLTFLoader();
 
-
 gltfLoader.load('/christmas_hot_chocolate_with_marshmallow_snowman.glb', (gltf) => {
-  hotChocolate = gltf.scene;
+  const model = gltf.scene;
 
-  // Scale & position perfectly inside globe
-  hotChocolate.scale.set(45, 45, 45);        // perfect size
-  hotChocolate.position.set(0, -68, 0);     // sits on snow base
-  hotChocolate.rotation.y = Math.PI / 6;    // cute angle
+  model.scale.set(500, 500, 500);    // perfect size
+  model.position.set(0, -62, 0);   // center it
 
-  // Make materials pop (extra shiny & warm)
-  hotChocolate.traverse((child) => {
-    if ((child as THREE.Mesh).isMesh) {
-      const mesh = child as THREE.Mesh;
-      const mat = mesh.material as THREE.MeshStandardMaterial;
-      if (mat) {
-        mat.metalness = mat.name.includes('chocolate') ? 0.3 : 0.1;
-        mat.roughness = mat.name.includes('marshmallow') ? 0.8 : 0.4;
-        mat.envMapIntensity = 3.0;
-      }
-    }
-  });
+  scene.add(model);
 
-  // CRITICAL: Add to glassShell so it rotates with the globe!
-  glassShell.add(hotChocolate);
-
-  console.log('Hot chocolate snowman loaded — winter perfection achieved!');
+  console.log('HOT CHOCOLATE IS NOW VISIBLE — WINTER IS SAVED!');
 });
 
 // ———————— SNOWFLAKE PHYSICS ————————
@@ -153,9 +135,8 @@ const snowTexture = new THREE.TextureLoader().load('/snowflake.png');
 
 // Exact top of snow base (debugged!)
 const GROUND_Y = snowBase.position.y + 24; // 48/2 = 24
-const flake_heights = [];
 function spawnSnow() {
-  flakes.length = 0;
+  flakes.forEach((f) => scene.remove(f));  // Changed from water.remove — no water anymore
 
   for (let i = 0; i < 800; i++) {
     const size = 5 + Math.random() * 5;
@@ -183,8 +164,6 @@ function spawnSnow() {
       Math.sin(angle) * radius
     );
 
-    flake_heights.push(GROUND_Y + pileHeight);
-
     flake.rotation.z = Math.random() * Math.PI * 2;
     flake.userData.velocity = new THREE.Vector3(0, 0, 0);
 
@@ -194,7 +173,7 @@ function spawnSnow() {
 }
 spawnSnow();
 
-// ———————— LIGHTING ————————
+// ———————— LIGHTIxNG ————————
 scene.add(new THREE.AmbientLight(0xffffff, 1.4));
 const topLight = new THREE.DirectionalLight(0xffffff, 0.7);
 topLight.position.set(0, 200, 100);
@@ -225,8 +204,6 @@ controls.addEventListener('change', () => {
 
 // ———————— ANIMATION LOOP WITH REAL SNOW PHYSICS ————————
 const clock = new THREE.Clock();
-const gravity = 9.8;
-const drag = 0.955;
 const groundY = -60; // top of snow base
 
 function animate() {
