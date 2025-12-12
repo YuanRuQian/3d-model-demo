@@ -42,24 +42,20 @@ const glassShell = new THREE.Mesh(
 glassShell.renderOrder = 999;
 scene.add(glassShell);
 
-// ———————— INSTEAD: FAKE THE WATER WITH TRANSMISSION ONLY ————————
 glassShell.material = new THREE.MeshPhysicalMaterial({
   color: 0xffffff,
   metalness: 0,
   roughness: 0,
-  transmission: 1.0, // ← FULLY transparent glass
-  thickness: 15, // ← fake water thickness inside
-  ior: 1.5, // glass IOR
+  transmission: 1.0,
+  thickness: 15,
+  ior: 1.5,
   clearcoat: 1.0,
   clearcoatRoughness: 0,
-  envMapIntensity: 2.5, // ← this creates the "liquid" look!
+  envMapIntensity: 2.5,
   depthWrite: false,
 });
-
-// Optional: add a very subtle blue tint to simulate water
 glassShell.material.color = new THREE.Color(0xf0f8ff);
 
-// Add a high-quality environment map for beautiful reflections
 const cubeLoader = new THREE.CubeTextureLoader();
 const envMap = cubeLoader.load([
   'https://threejs.org/examples/textures/cube/Park3Med/px.jpg',
@@ -70,13 +66,12 @@ const envMap = cubeLoader.load([
   'https://threejs.org/examples/textures/cube/Park3Med/nz.jpg',
 ]);
 envMap.mapping = THREE.CubeReflectionMapping;
-scene.environment = envMap; // ← this gives the liquid reflections!
+scene.environment = envMap;
 glassShell.material.envMap = envMap;
 
-// ———————— CLASSIC SNOW GLOBE BASE (NOW IN WORLD SPACE!) ————————
+// ———————— CLASSIC SNOW GLOBE BASE ————————
 const baseGroup = new THREE.Group();
 
-// Snow platform
 const snowBase = new THREE.Mesh(
   new THREE.CylinderGeometry(95, 105, 48, 64, 1),
   new THREE.MeshStandardMaterial({
@@ -111,47 +106,70 @@ ring.position.y = -98;
 ring.rotation.x = Math.PI / 2;
 baseGroup.add(ring);
 
-// ADD TO SCENE, NOT WATER!!!
 scene.add(baseGroup);
 
-// ———————— HOT CHOCOLATE MARSHMALLOW SNOWMAN (SPINS WITH GLOBE!) ————————
-
+// ———————— HOT CHOCOLATE MARSHMALLOW SNOWMAN ————————
 const gltfLoader = new GLTFLoader();
 
 gltfLoader.load('/christmas_hot_chocolate_with_marshmallow_snowman.glb', (gltf) => {
   const model = gltf.scene;
-
-  model.scale.set(500, 500, 500);    // perfect size
-  model.position.set(0, -62, 0);   // center it
-
+  model.scale.set(500, 500, 500);
+  model.position.set(0, -62, 0);
   scene.add(model);
-
   console.log('HOT CHOCOLATE IS NOW VISIBLE — WINTER IS SAVED!');
 });
 
-// ———————— SNOWFLAKE PHYSICS ————————
-const flakes: THREE.Mesh[] = [];
-const snowTexture = new THREE.TextureLoader().load('/snowflake.png');
+// ———————— 3D SNOWFLAKE PHYSICS (REPLACING PNG) ————————
+const flakes: THREE.Object3D[] = [];
+let snowflakeTemplate: THREE.Group | null = null;
 
-// Exact top of snow base (debugged!)
-const GROUND_Y = snowBase.position.y + 24; // 48/2 = 24
+gltfLoader.load(
+  '/snowflake_cutter.glb',
+  (gltf) => {
+    snowflakeTemplate = gltf.scene;
+
+    // Enhance material for all meshes in the snowflake (make it bright & icy)
+// Enhance material for all meshes in the snowflake
+snowflakeTemplate.traverse((child) => {
+  if (child instanceof THREE.Mesh) {
+    // We switch to StandardMaterial or Physical WITHOUT transmission
+    // This ensures they are opaque enough to be rendered inside the glass shell
+    child.material = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      metalness: 0.2,   // Slight shine
+      roughness: 0.1,   // Smooth like ice
+      transmission: 0,  // ✅ KEY FIX: Must be 0 to render inside other glass
+      thickness: 0,     // ✅ KEY FIX
+      ior: 1.5,
+      clearcoat: 1.0,   // Keeps the shiny "wet" ice look
+      clearcoatRoughness: 0.1,
+      envMapIntensity: 1.0,
+    });
+    child.castShadow = true;
+    child.receiveShadow = true;
+  }
+});
+
+    // Now spawn the flakes using the loaded 3D model
+    spawnSnow();
+  },
+  undefined,
+  (err) => console.error('Snowflake GLB load failed:', err)
+);
+
+const GROUND_Y = snowBase.position.y + 24; // top of snow base
+
 function spawnSnow() {
+  if (!snowflakeTemplate) return; // safety if model not loaded yet
+
   flakes.forEach((f) => scene.remove(f));  // Changed from water.remove — no water anymore
 
   for (let i = 0; i < 800; i++) {
-    const size = 5 + Math.random() * 5;
+    const flake = snowflakeTemplate!.clone();
 
-    const flake = new THREE.Mesh(
-      new THREE.PlaneGeometry(size, size),
-      new THREE.MeshBasicMaterial({
-        map: snowTexture,
-        transparent: true,
-        opacity: 0.96,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-        side: THREE.DoubleSide,
-      })
-    );
+    const baseSize = (3 + Math.random() * 4) / 75;
+    const scale = baseSize * (0.8 + Math.random() * 0.6);
+    flake.scale.set(scale, scale, scale);
 
     // Start piled on the snowy base
     const angle = Math.random() * Math.PI * 2;
@@ -171,15 +189,14 @@ function spawnSnow() {
     flakes.push(flake);
   }
 }
-spawnSnow();
 
-// ———————— LIGHTIxNG ————————
+// ———————— LIGHTING ————————
 scene.add(new THREE.AmbientLight(0xffffff, 1.4));
 const topLight = new THREE.DirectionalLight(0xffffff, 0.7);
 topLight.position.set(0, 200, 100);
 scene.add(topLight);
 
-// ———————— SHAKE DETECTION (upward kick when dragging) ————————
+// ———————— SHAKE DETECTION ————————
 let lastAngle = controls.getAzimuthalAngle();
 controls.addEventListener('change', () => {
   const current = controls.getAzimuthalAngle();
@@ -194,7 +211,7 @@ controls.addEventListener('change', () => {
       v.add(
         new THREE.Vector3(
           (Math.random() - 0.5) * strength,
-          Math.random() * strength * 1.2, // strong upward burst
+          Math.random() * strength * 1.2,
           (Math.random() - 0.5) * strength
         )
       );
@@ -202,74 +219,66 @@ controls.addEventListener('change', () => {
   }
 });
 
-// ———————— ANIMATION LOOP WITH REAL SNOW PHYSICS ————————
+// ———————— ANIMATION LOOP ————————
 const clock = new THREE.Clock();
-const groundY = -60; // top of snow base
 
 function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
   const time = clock.getElapsedTime();
 
-  // Gentle auto-spin (optional, looks magical)
   glassShell.rotation.y += 0.0008;
 
   flakes.forEach((flake) => {
     const pos = flake.position;
     const vel = flake.userData.velocity as THREE.Vector3;
 
-    // ——— FLUID TURBULENCE (this is the magic) ———
-    // Add gentle swirling based on position + time (like real water currents)
+    // Fluid turbulence
     const swirlStrength = 8;
     const swirlSpeed = 0.5;
     const swirlX = Math.sin(time * swirlSpeed + pos.z * 0.02) * swirlStrength;
     const swirlZ = Math.cos(time * swirlSpeed + pos.x * 0.02) * swirlStrength;
-    const swirlY = Math.sin(time * 0.7 + pos.x * 0.015) * 3; // gentle up/down waves
+    const swirlY = Math.sin(time * 0.7 + pos.x * 0.015) * 3;
 
     vel.x += swirlX * delta;
     vel.y += swirlY * delta;
     vel.z += swirlZ * delta;
 
-    // Add tiny random wobble (per-flake chaos)
     if (Math.random() < 0.3) {
-      // ~30% chance per frame
       vel.x += (Math.random() - 0.5) * 3;
       vel.y += (Math.random() - 0.5) * 2;
       vel.z += (Math.random() - 0.5) * 3;
     }
 
-    // ——— PHYSICS (now feels like thick syrup) ———
-    vel.multiplyScalar(0.97); // heavier drag = floaty, slow motion
-    vel.y -= 4 * delta; // slower, gentler gravity (was 28)
+    vel.multiplyScalar(0.97);
+    vel.y -= 4 * delta;
 
     pos.addScaledVector(vel, delta * 60);
 
-    // ——— GROUND COLLISION (soft landing + pile) ———
-    if (pos.y < groundY) {
-      pos.y = groundY;
-      vel.y = Math.abs(vel.y) * 0.4; // softer bounce
+    // Ground collision
+    if (pos.y < GROUND_Y) {
+      pos.y = GROUND_Y;
+      vel.y = Math.abs(vel.y) * 0.4;
       vel.x *= 0.75;
       vel.z *= 0.75;
 
       if (vel.length() < 3.5) {
-        vel.set(0, 0, 0); // settle peacefully
+        vel.set(0, 0, 0);
       }
     }
 
-    // ——— GLOBE WALL (soft push inward & bounce back from the glass) ———
+    // Globe wall bounce
     const dist = pos.length();
     if (dist > 108) {
-      const pushIn = pos
-        .clone()
-        .normalize()
-        .multiplyScalar(-8 * delta);
+      const pushIn = pos.clone().normalize().multiplyScalar(-8 * delta);
       vel.add(pushIn);
       pos.normalize().multiplyScalar(108);
     }
 
-    // ——— BILLBOARD + gentle spin ———
-    flake.lookAt(camera.position);
-    flake.rotation.z += Math.PI + delta * 2; // slow elegant spin while falling
+    // Continuous random rotation for 3D tumbling effect
+    flake.rotation.x += delta * 0.5 * (Math.random() - 0.5);
+    flake.rotation.y += delta * 1.2;
+    flake.rotation.z += delta * 0.8 * (Math.random() - 0.5);
   });
 
   controls.update();
@@ -278,7 +287,7 @@ function animate() {
 
 animate();
 
-// Resize handler
+// Resize
 window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
