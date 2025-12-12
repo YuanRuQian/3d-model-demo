@@ -130,25 +130,28 @@ gltfLoader.load(
 
     // Enhance material for all meshes in the snowflake (make it bright & icy)
 // Enhance material for all meshes in the snowflake
-snowflakeTemplate.traverse((child) => {
-  if (child instanceof THREE.Mesh) {
-    // We switch to StandardMaterial or Physical WITHOUT transmission
-    // This ensures they are opaque enough to be rendered inside the glass shell
-    child.material = new THREE.MeshPhysicalMaterial({
-      color: 0xffffff,
-      metalness: 0.2,   // Slight shine
-      roughness: 0.1,   // Smooth like ice
-      transmission: 0,  // ✅ KEY FIX: Must be 0 to render inside other glass
-      thickness: 0,     // ✅ KEY FIX
-      ior: 1.5,
-      clearcoat: 1.0,   // Keeps the shiny "wet" ice look
-      clearcoatRoughness: 0.1,
-      envMapIntensity: 1.0,
+    snowflakeTemplate.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        // We switch to StandardMaterial or Physical WITHOUT transmission
+        // This ensures they are opaque enough to be rendered inside the glass shell
+        child.material = new THREE.MeshPhysicalMaterial({
+          color: 0xffffff,
+          emissive: 0xffffff, // Adds a self-glowing white color
+          emissiveIntensity: 0.5, // Controls how bright the glow is
+          metalness: 0.1,
+          roughness: 0.8, // Snow is usually rough, not shiny like ice
+          transmission: 0,
+
+          thickness: 0,     // ✅ KEY FIX
+          ior: 1.5,
+          clearcoat: 1.0,   // Keeps the shiny "wet" ice look
+          clearcoatRoughness: 0.1,
+          envMapIntensity: 1.0,
+        });
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
     });
-    child.castShadow = true;
-    child.receiveShadow = true;
-  }
-});
 
     // Now spawn the flakes using the loaded 3D model
     spawnSnow();
